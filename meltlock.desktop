@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Lock Screen
+Comment=Lock the screen with meltlock
+Exec=@BIN@
+Icon=system-lock-screen
+Keywords=lock;swaylock;screen;
+Terminal=false
