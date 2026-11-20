@@ -41,13 +41,22 @@ Look at the PNGs to judge changes to the effect.
 
 - `~/.config/sway/config` binds `$mod+Escape` to `~/.local/bin/meltlock`.
 - `~/.local/share/applications/meltlock.desktop` ("Lock Screen").
-- The sway config still has an `xss-lock ... i3lock` line that does nothing
-  under Wayland. Locking on idle or before suspend (swayidle) is not set up.
+- The sway config runs `swayidle -w before-sleep meltlock lock meltlock`,
+  binds lid close and `$mod+Shift+Escape` to `systemctl suspend`.
+- `~/.local/share/applications/suspend.desktop` ("Suspend").
 
-## Ideas
+## Animation: swaylock-plugin (in progress)
 
-- Animation needs a different locker than plain swaylock.
-- Lock automatically before suspend and after idle with swayidle.
+The plan for an animated lock screen is swaylock-plugin, a swaylock fork
+that lets a wallpaper program draw the background.
+
+- `scripts/build-swaylock-plugin.sh` builds it into `~/.local/bin` without
+  root. It patches the PAM service name to `swaylock` so the existing
+  `/etc/pam.d/swaylock` is used.
+- `scripts/trial.sh` (installed as `meltlock-trial`) locks with it and
+  unlocks automatically after 45 s. The author runs it; agents do not.
+- Not done yet: confirming it locks and unlocks on sway 1.9, and writing
+  the animated background program. meltlock still uses plain swaylock.
 
 ## Conventions
 
