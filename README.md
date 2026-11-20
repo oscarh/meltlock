@@ -10,6 +10,14 @@ lock looks different.
 `swaylock` does the locking and the password check. meltlock only makes the
 picture, in about 0.2 s, and starts swaylock even if the picture fails.
 
+## Animated
+
+With `swaylock-plugin` installed (`scripts/build-swaylock-plugin.sh`) the
+dots move: drips run down the picture and slowly wear it away, a pool
+gathers at the bottom, and the date and a running clock are shown. For now
+this is opt-in with `MELTLOCK_ANIMATED=1`; `meltlock-trial` tries it with
+an automatic unlock after 60 s.
+
 ## Use
 
 | How | |

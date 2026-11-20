@@ -1,17 +1,24 @@
 #!/bin/sh
-# Safe trial of swaylock-plugin.
+# Safe trial of the animated lock (swaylock-plugin + `meltlock bg`).
 #
-# Locks the screen with swaylock-plugin showing the meltlock picture. Try to
-# unlock with your password. If the screen is still locked after
-# $TRIAL_SECONDS (default 45), it is unlocked automatically, so a locker
-# that cannot check the password does not leave you stuck.
+# Locks the screen exactly as meltlock will once the animated lock is the
+# default. Unlock with your password. If the screen is still locked after
+# $TRIAL_SECONDS (default 60), it is unlocked automatically, so a lock that
+# misbehaves does not leave you stuck.
 set -eu
 
-secs=${TRIAL_SECONDS:-45}
-dir=${XDG_RUNTIME_DIR}/meltlock
+secs=${TRIAL_SECONDS:-60}
 bin=$HOME/.local/bin
 
-img=$("$bin/meltlock" preview "$dir" | head -n 1 | cut -d: -f2-)
+locked() { pgrep -x swaylock-plugin >/dev/null; }
+
+start=$(date +%s)
+MELTLOCK_ANIMATED=1 "$bin/meltlock"
+sleep 1
+if ! locked; then
+	echo "The lock did not start."
+	exit 1
+fi
 
 (
 	sleep "$secs"
@@ -24,13 +31,10 @@ img=$("$bin/meltlock" preview "$dir" | head -n 1 | cut -d: -f2-)
 	fi
 ) &
 
-start=$(date +%s)
-"$bin/swaylock-plugin" --ignore-empty-password --command-each "swaybg -m fill -i $img"
-status=$?
+while locked; do sleep 0.5; done
 took=$(($(date +%s) - start))
-
 if [ "$took" -ge "$secs" ]; then
 	echo "Not unlocked by password within ${secs}s; it was unlocked automatically."
 else
-	echo "Unlocked after ${took}s (exit $status)."
+	echo "Unlocked by password after ${took}s."
 fi

@@ -1,8 +1,13 @@
-// meltlock locks the screen with swaylock, showing the current desktop
-// melted into dots in the Catppuccin Mocha palette.
+// meltlock locks the screen, showing the current desktop melted into dots
+// in the Catppuccin Mocha palette.
 //
-// swaylock does the locking and the password check. meltlock only makes
-// the picture, and always starts swaylock even if the picture fails.
+// With swaylock-plugin installed the dots are animated: meltlock hands it
+// a coarse snapshot of each output and is started again by it, as
+// `meltlock bg`, to draw the background. Without it, plain swaylock shows
+// a still picture.
+//
+// The locker does the locking and the password check. meltlock only makes
+// the picture, and always starts the locker even if the picture fails.
 package main
 
 import (
@@ -20,7 +25,15 @@ import (
 	"time"
 )
 
-// swaylock indicator colours, rrggbbaa.
+const usage = `usage: meltlock [command]
+
+  (none)            lock the screen
+  preview [DIR]     write the still pictures without locking
+  frames DIR        write the animation at a few points in time
+  bg [overlay]      draw the animated background (run by swaylock-plugin)
+`
+
+// Indicator colours, rrggbb[aa]. Shared by swaylock and swaylock-plugin.
 var lockArgs = []string{
 	"--daemonize", "--ignore-empty-password", "--show-failed-attempts",
 	"--scaling", "fill", "--color", "11111b",
@@ -37,36 +50,90 @@ var lockArgs = []string{
 }
 
 func main() {
-	preview := len(os.Args) > 1 && os.Args[1] == "preview"
-	if !preview && exec.Command("pgrep", "-x", "swaylock").Run() == nil {
-		return // already locked
-	}
 	dir := filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "meltlock")
-	if preview && len(os.Args) > 2 {
-		dir = os.Args[2]
-	}
-	images := render(dir)
-	if preview {
-		for _, i := range images {
-			fmt.Println(i)
+	arg := func(i int) string {
+		if len(os.Args) > i {
+			return os.Args[i]
 		}
-		return
+		return ""
 	}
-	args := append([]string{"swaylock"}, lockArgs...)
-	for _, i := range images {
-		args = append(args, "--image", i)
+	var err error
+	switch arg(1) {
+	case "":
+		err = lock(dir)
+	case "bg":
+		layer := uint32(layerBack)
+		if arg(2) == "overlay" {
+			layer = layerOverlay
+		}
+		err = runBackground(dir, layer)
+	case "preview":
+		if arg(2) != "" {
+			dir = arg(2)
+		}
+		for _, image := range capture(dir, false) {
+			fmt.Println(image)
+		}
+	case "frames":
+		if arg(2) == "" {
+			fmt.Fprint(os.Stderr, usage)
+			os.Exit(2)
+		}
+		err = frames(arg(2))
+	default:
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(2)
 	}
-	path, err := exec.LookPath("swaylock")
-	if err == nil {
-		err = syscall.Exec(path, args, os.Environ())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "meltlock:", err)
+		os.Exit(1)
 	}
-	fmt.Fprintln(os.Stderr, "meltlock:", err)
-	os.Exit(1)
 }
 
-// render makes one picture per output and returns them as output:path.
-// Outputs that fail are left out and get swaylock's plain colour.
-func render(dir string) []string {
+func lock(dir string) error {
+	for _, name := range []string{"swaylock", "swaylock-plugin"} {
+		if exec.Command("pgrep", "-x", name).Run() == nil {
+			return nil // already locked
+		}
+	}
+	self, _ := os.Executable()
+	if plugin := findPlugin(self); plugin != "" {
+		capture(dir, true)
+		args := append([]string{"swaylock-plugin"}, lockArgs...)
+		args = append(args, "--command-each", self+" bg")
+		return syscall.Exec(plugin, args, os.Environ())
+	}
+	args := append([]string{"swaylock"}, lockArgs...)
+	for _, image := range capture(dir, false) {
+		args = append(args, "--image", image)
+	}
+	path, err := exec.LookPath("swaylock")
+	if err != nil {
+		return err
+	}
+	return syscall.Exec(path, args, os.Environ())
+}
+
+// findPlugin looks for swaylock-plugin next to meltlock and on the PATH.
+// The animated lock is opt-in with MELTLOCK_ANIMATED=1 until it has been
+// tried on a real lock.
+func findPlugin(self string) string {
+	if os.Getenv("MELTLOCK_ANIMATED") == "" {
+		return ""
+	}
+	beside := filepath.Join(filepath.Dir(self), "swaylock-plugin")
+	if info, err := os.Stat(beside); self != "" && err == nil && info.Mode()&0o111 != 0 {
+		return beside
+	}
+	path, _ := exec.LookPath("swaylock-plugin")
+	return path
+}
+
+// capture screenshots every output into dir. With animated set it stores a
+// snapshot per output for `meltlock bg`; otherwise it renders still
+// pictures and returns them as output:path. Outputs that fail are left
+// out and get the locker's plain colour.
+func capture(dir string, animated bool) []string {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil
 	}
@@ -80,19 +147,31 @@ func render(dir string) []string {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			path := filepath.Join(dir, out+".png")
-			if err := renderOutput(ctx, out, path, now); err != nil {
-				fmt.Fprintf(os.Stderr, "meltlock: %s: %v\n", out, err)
-				return
+			snap, png := filepath.Join(dir, out+".snap"), filepath.Join(dir, out+".png")
+			g, w, h, err := grab(ctx, out)
+			switch {
+			case err != nil:
+				os.Remove(snap) // never animate a stale desktop
+			case animated:
+				err = g.snapshot().save(snap)
+			default:
+				g.snapshot().save(snap) // lets `meltlock bg` be tried by hand
+				g.melt(rand.New(rand.NewSource(now.UnixNano() + int64(i))))
+				g.stamp("LOCKED SINCE", now.Format("15:04"))
+				if err = savePNG(png, g, w, h); err == nil {
+					images[i] = out + ":" + png
+				}
 			}
-			images[i] = out + ":" + path
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "meltlock: %s: %v\n", out, err)
+			}
 		}()
 	}
 	wg.Wait()
 	var ok []string
-	for _, i := range images {
-		if i != "" {
-			ok = append(ok, i)
+	for _, image := range images {
+		if image != "" {
+			ok = append(ok, image)
 		}
 	}
 	return ok
@@ -117,19 +196,20 @@ func outputs(ctx context.Context) []string {
 	return names
 }
 
-func renderOutput(ctx context.Context, out, path string, now time.Time) error {
+// grab screenshots one output and reduces it to the cell grid.
+func grab(ctx context.Context, out string) (g *grid, w, h int, err error) {
 	shot, err := exec.CommandContext(ctx, "grim", "-o", out, "-t", "ppm", "-").Output()
 	if err != nil {
-		return err
+		return nil, 0, 0, err
 	}
 	pix, w, h, err := readPPM(bytes.NewReader(shot))
 	if err != nil {
-		return err
+		return nil, 0, 0, err
 	}
-	g := sample(pix, w, h)
-	g.melt(rand.New(rand.NewSource(now.UnixNano() + int64(len(out)))))
-	g.stamp("LOCKED SINCE", now.Format("15:04"))
+	return sample(pix, w, h), w, h, nil
+}
 
+func savePNG(path string, g *grid, w, h int) error {
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -144,4 +224,19 @@ func renderOutput(ctx context.Context, out, path string, now time.Time) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// frames writes the animation of the first output at a few points in time.
+func frames(dir string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	outs := outputs(ctx)
+	if len(outs) == 0 {
+		return fmt.Errorf("no outputs")
+	}
+	g, _, _, err := grab(ctx, outs[0])
+	if err != nil {
+		return err
+	}
+	return dumpFrames(dir, g.snapshot(), []float64{1, 8, 45, 240, 1200})
 }

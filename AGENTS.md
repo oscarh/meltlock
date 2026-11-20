@@ -26,9 +26,12 @@ an agent, because the agent cannot type the password.
 
 | File | Contents |
 |---|---|
-| `main.go` | Screenshot per output, swaylock arguments, exec |
-| `render.go` | PPM reader, grid, melt, stamp, dot renderer |
-| `font.go` | 5x7 bitmap font, only the characters the stamp uses |
+| `main.go` | Commands, screenshot per output, locker arguments, exec |
+| `render.go` | PPM reader, grid, and the still picture (melt, stamp, draw) |
+| `scene.go` | Snapshot file and the animated simulation |
+| `paint.go` | Dot masks and incremental painting into a buffer |
+| `wl.go`, `bg.go` | Minimal Wayland client and the background program |
+| `font.go` | 5x7 bitmap font: digits, colon, capitals |
 
 ## Testing
 
@@ -45,18 +48,36 @@ Look at the PNGs to judge changes to the effect.
   binds lid close and `$mod+Shift+Escape` to `systemctl suspend`.
 - `~/.local/share/applications/suspend.desktop` ("Suspend").
 
-## Animation: swaylock-plugin (in progress)
+## Animation
 
-The plan for an animated lock screen is swaylock-plugin, a swaylock fork
-that lets a wallpaper program draw the background.
+With swaylock-plugin the dot wall is animated: drips run down the picture
+and wear it away, a pool collects at the bottom, bands glitch sideways,
+and the date and a running clock are shown.
 
-- `scripts/build-swaylock-plugin.sh` builds it into `~/.local/bin` without
-  root. It patches the PAM service name to `swaylock` so the existing
-  `/etc/pam.d/swaylock` is used.
-- `scripts/trial.sh` (installed as `meltlock-trial`) locks with it and
-  unlocks automatically after 45 s. The author runs it; agents do not.
-- Not done yet: confirming it locks and unlocks on sway 1.9, and writing
-  the animated background program. meltlock still uses plain swaylock.
+- `meltlock` captures a `.snap` per output (cell grid only) into
+  `$XDG_RUNTIME_DIR/meltlock` and execs
+  `swaylock-plugin --command-each 'meltlock bg'`.
+- `meltlock bg` is a wallpaper client written against the raw Wayland
+  protocol (`wl.go`, `bg.go`): wl_shm buffers on a layer surface, only
+  changed cells repainted, paced by frame callbacks so it stops drawing
+  when the output is off. `scene.go` is the simulation, `paint.go` the dots.
+- `scripts/build-swaylock-plugin.sh` builds swaylock-plugin into
+  `~/.local/bin` without root. It patches the PAM service name to
+  `swaylock` so the existing `/etc/pam.d/swaylock` is used.
+- **Opt-in for now:** animated only with `MELTLOCK_ANIMATED=1`; otherwise
+  the still picture with plain swaylock. Make it the default (in
+  `findPlugin`) once the author confirms `meltlock-trial` works.
+- `scripts/trial.sh` (installed as `meltlock-trial`) runs the animated lock
+  and unlocks automatically after 60 s. The author runs it; agents do not.
+
+Verified: swaylock-plugin locks and unlocks by password on this machine
+(author, with a still background). `meltlock bg` runs on sway itself
+(`meltlock bg overlay` under `timeout`, about 9% of one core). Not yet
+verified: `meltlock bg` inside swaylock-plugin.
+
+To look at the animation without locking: `meltlock frames DIR` writes
+PNGs at 1 s, 8 s, 45 s, 4 min and 20 min; `timeout 5 meltlock bg overlay`
+shows it live on top of everything (it takes the pointer while it runs).
 
 ## Conventions
 
