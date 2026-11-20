@@ -115,10 +115,9 @@ func lock(dir string) error {
 }
 
 // findPlugin looks for swaylock-plugin next to meltlock and on the PATH.
-// The animated lock is opt-in with MELTLOCK_ANIMATED=1 until it has been
-// tried on a real lock.
+// MELTLOCK_STATIC=1 forces the still picture.
 func findPlugin(self string) string {
-	if os.Getenv("MELTLOCK_ANIMATED") == "" {
+	if os.Getenv("MELTLOCK_STATIC") != "" {
 		return ""
 	}
 	beside := filepath.Join(filepath.Dir(self), "swaylock-plugin")

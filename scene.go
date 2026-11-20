@@ -118,13 +118,13 @@ func newScene(cols, rows int, snap snapshot, seed int64) *scene {
 func (s *scene) step(dt float64, now time.Time) {
 	s.t += dt
 
-	fade := math.Exp(-dt / 0.8)
+	fade := math.Exp(-dt / 1.6)
 	for i := range s.glow {
 		s.glow[i] *= fade
 	}
 
-	// About one new drip per eight columns each second.
-	s.spawn += dt * float64(s.cols) / 8
+	// About one new drip per twenty columns each second.
+	s.spawn += dt * float64(s.cols) / 20
 	for ; s.spawn >= 1; s.spawn-- {
 		s.addDrip()
 	}
@@ -132,17 +132,17 @@ func (s *scene) step(dt float64, now time.Time) {
 	live := s.drips[:0]
 	for _, d := range s.drips {
 		from := int(d.y)
-		d.v += 25 * dt
+		d.v += 6 * dt
 		d.y += d.v * dt
 		floor := s.rows - 1 - int(s.pool[d.c])
 		for r := from + 1; r <= int(d.y) && r <= floor; r++ {
 			i := r*s.cols + d.c
 			s.glow[i], s.glowCol[i] = d.lum, d.col
-			s.lum[i] *= 0.97 // the picture wears away where drips run
+			s.lum[i] *= 0.985 // the picture wears away where drips run
 		}
 		if int(d.y) >= floor {
 			limit := float64(s.rows) * 0.3
-			s.pool[d.c] = math.Min(limit, s.pool[d.c]+0.15)
+			s.pool[d.c] = math.Min(limit, s.pool[d.c]+0.1)
 			s.poolCol[d.c] = mix(s.poolCol[d.c], d.col, 0.2)
 			continue
 		}
@@ -191,7 +191,7 @@ func (s *scene) addDrip() {
 			edges = append(edges, r)
 		}
 	}
-	d := drip{c: c, v: 4 + 10*s.rng.Float64()}
+	d := drip{c: c, v: 2 + 5*s.rng.Float64()}
 	if len(edges) > 0 && s.rng.Float64() < 0.75 {
 		r := edges[s.rng.Intn(len(edges))]
 		i := r*s.cols + c

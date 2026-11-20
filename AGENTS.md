@@ -64,16 +64,16 @@ and the date and a running clock are shown.
 - `scripts/build-swaylock-plugin.sh` builds swaylock-plugin into
   `~/.local/bin` without root. It patches the PAM service name to
   `swaylock` so the existing `/etc/pam.d/swaylock` is used.
-- **Opt-in for now:** animated only with `MELTLOCK_ANIMATED=1`; otherwise
-  the still picture with plain swaylock. Make it the default (in
-  `findPlugin`) once the author confirms `meltlock-trial` works.
+- Animated is the default when swaylock-plugin is found;
+  `MELTLOCK_STATIC=1` forces the still picture with plain swaylock.
 - `scripts/trial.sh` (installed as `meltlock-trial`) runs the animated lock
   and unlocks automatically after 60 s. The author runs it; agents do not.
 
-Verified: swaylock-plugin locks and unlocks by password on this machine
-(author, with a still background). `meltlock bg` runs on sway itself
-(`meltlock bg overlay` under `timeout`, about 9% of one core). Not yet
-verified: `meltlock bg` inside swaylock-plugin.
+The author has run the animated lock through `meltlock-trial` and liked
+it; pace was then slowed on request (constants in `scene.go`: spawn rate,
+drip speed, wear per pass, pool growth, trail fade).
+
+Next: the author wants more animation variants of different kinds.
 
 To look at the animation without locking: `meltlock frames DIR` writes
 PNGs at 1 s, 8 s, 45 s, 4 min and 20 min; `timeout 5 meltlock bg overlay`

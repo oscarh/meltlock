@@ -13,7 +13,7 @@ bin=$HOME/.local/bin
 locked() { pgrep -x swaylock-plugin >/dev/null; }
 
 start=$(date +%s)
-MELTLOCK_ANIMATED=1 "$bin/meltlock"
+"$bin/meltlock"
 sleep 1
 if ! locked; then
 	echo "The lock did not start."
