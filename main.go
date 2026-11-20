@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -34,8 +35,9 @@ const usage = `usage: meltlock [command]
   bg [EFFECT] [overlay]
                     draw the animated background (run by swaylock-plugin)
 
-Effects: melt, sand, ripple, drift, life, pulse. One is picked at random for each
-lock; MELTLOCK_EFFECT=melt,sand limits the choice.
+Effects: melt, sand, ripple, drift, life, pulse, silk. One is picked at random
+for each lock. Switch effects off in ~/.config/meltlock/effects with lines
+like "sand off"; MELTLOCK_EFFECT=melt,silk overrides the file.
 `
 
 // Indicator colours, rrggbb[aa]. Shared by swaylock and swaylock-plugin.
@@ -126,10 +128,39 @@ func lock(dir string) error {
 	return syscall.Exec(path, args, os.Environ())
 }
 
-// chooseEffect picks the effect for this lock: any of them, or one of the
-// comma-separated names in MELTLOCK_EFFECT.
+// chooseEffect picks the effect for this lock: one of the comma-separated
+// names in MELTLOCK_EFFECT, or else one that the effects file leaves on.
 func chooseEffect() string {
-	return pickEffect(os.Getenv("MELTLOCK_EFFECT"), rand.New(rand.NewSource(time.Now().UnixNano())))
+	spec := os.Getenv("MELTLOCK_EFFECT")
+	if spec == "" {
+		dir := os.Getenv("XDG_CONFIG_HOME")
+		if dir == "" {
+			dir = filepath.Join(os.Getenv("HOME"), ".config")
+		}
+		conf, _ := os.ReadFile(filepath.Join(dir, "meltlock", "effects"))
+		spec = enabledEffects(string(conf))
+	}
+	return pickEffect(spec, rand.New(rand.NewSource(time.Now().UnixNano())))
+}
+
+// enabledEffects reads the effects file: one "name on" or "name off" per
+// line, # starts a comment. Effects it does not mention are on. The result
+// is a list for pickEffect.
+func enabledEffects(conf string) string {
+	off := map[string]bool{}
+	for _, line := range strings.Split(conf, "\n") {
+		line, _, _ = strings.Cut(line, "#")
+		if f := strings.Fields(strings.ToLower(strings.ReplaceAll(line, "=", " "))); len(f) >= 2 {
+			off[f[0]] = f[1] == "off" || f[1] == "no" || f[1] == "false" || f[1] == "0"
+		}
+	}
+	var on []string
+	for _, e := range effects {
+		if !off[e.name] {
+			on = append(on, e.name)
+		}
+	}
+	return strings.Join(on, ",")
 }
 
 // findPlugin looks for swaylock-plugin next to meltlock and on the PATH.

@@ -77,6 +77,14 @@ var effects = []struct {
 	{"drift", shapeBar, newDrift},
 	{"life", shapeSquare, newLife},
 	{"pulse", shapeDot, newPulse},
+	{"silk", shapeDot, newSilk},
+}
+
+// painter is an effect that draws the pixels itself, at full resolution,
+// instead of leaving its cells to be drawn as shapes.
+type painter interface {
+	// frame fills a BGRX buffer of w by h pixels.
+	frame(s *scene, pix []byte, stride, w, h int)
 }
 
 // pickEffect chooses an effect from spec: empty or "random" means any, a
@@ -99,12 +107,14 @@ func pickEffect(spec string, rng *rand.Rand) string {
 // scene is the animated dot wall.
 type scene struct {
 	grid
-	vig     []float64 // darkening towards the corners
-	rng     *rand.Rand
-	t       float64
-	fx      effect
-	shape   uint32 // how cells are drawn, see paint.go
-	stamped string
+	vig      []float64 // darkening towards the corners
+	rng      *rand.Rand
+	t        float64
+	fx       effect
+	shape    uint32 // how cells are drawn, see paint.go
+	stamped  string
+	shade    []uint8 // per cell: how strongly the clock dims a painter's frame
+	shadeFor string
 }
 
 // newScene builds a scene of the given size. A snapshot of another size

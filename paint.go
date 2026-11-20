@@ -42,11 +42,71 @@ var masks = func() (m [shapes][levels][cell * cell]uint8) {
 
 type rect struct{ x, y, w, h int }
 
+func bgrOf(c rgb) [3]int {
+	return [3]int{int(c.b*255 + 0.5), int(c.g*255 + 0.5), int(c.r*255 + 0.5)}
+}
+
+// render draws the scene into a BGRX buffer and returns the changed area.
+// want and drawn are per-cell scratch and memory for the cell effects.
+func (s *scene) render(pix []byte, stride, w, h int, want, drawn []uint32) []rect {
+	p, ok := s.fx.(painter)
+	if !ok {
+		s.cells(want)
+		return paint(pix, stride, w, h, s.cols, s.rows, want, drawn)
+	}
+	p.frame(s, pix, stride, w, h)
+	s.overlay(pix, stride, w, h)
+	return []rect{{0, 0, w, h}}
+}
+
+// overlay draws the clock as dots over a painter's frame and dims the
+// area around it, with a soft edge.
+func (s *scene) overlay(pix []byte, stride, w, h int) {
+	const reach = 2 // cells over which the dimming tapers off
+	if s.shadeFor != s.stamped || len(s.shade) != len(s.mark) {
+		s.shadeFor, s.shade = s.stamped, make([]uint8, len(s.mark))
+		for i, m := range s.mark {
+			if m == plain {
+				continue
+			}
+			for r := max(i/s.cols-reach, 0); r <= min(i/s.cols+reach, s.rows-1); r++ {
+				for c := max(i%s.cols-reach, 0); c <= min(i%s.cols+reach, s.cols-1); c++ {
+					s.shade[r*s.cols+c]++
+				}
+			}
+		}
+	}
+	const full = (2*reach + 1) * (2*reach + 1)
+	bg, fg := bgrOf(crust), bgrOf(text)
+	mask := &masks[shapeDot][levels-1]
+	for i, n := range s.shade {
+		if n == 0 {
+			continue
+		}
+		keep := 256 - 200*int(n)/full // share of the picture that shows through
+		c, r := i%s.cols, i/s.cols
+		for y := 0; y < cell && r*cell+y < h; y++ {
+			row := pix[(r*cell+y)*stride:]
+			for x := 0; x < cell && c*cell+x < w; x++ {
+				o := row[(c*cell+x)*4:]
+				a := 0
+				if s.mark[i] == inked {
+					a = int(mask[y*cell+x])
+				}
+				for ch := 0; ch < 3; ch++ {
+					dim := bg[ch] + (int(o[ch])-bg[ch])*keep/256
+					o[ch] = uint8(dim + (fg[ch]-dim)*a/255)
+				}
+			}
+		}
+	}
+}
+
 // paint draws the cells that differ from what the buffer already shows.
 // pix is BGRX, drawn remembers the buffer's contents per cell. It returns
 // the changed area as one rectangle per row of cells.
 func paint(pix []byte, stride, w, h, cols, rows int, want, drawn []uint32) []rect {
-	bg := [3]int{int(crust.b*255 + 0.5), int(crust.g*255 + 0.5), int(crust.r*255 + 0.5)}
+	bg := bgrOf(crust)
 	var damage []rect
 	for r := 0; r < rows; r++ {
 		first, last := -1, -1

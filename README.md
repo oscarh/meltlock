@@ -24,8 +24,16 @@ picked at random for each lock:
 | `drift` | A wind sorts each row by brightness until only gradients are left | bars |
 | `life` | The bright parts come alive as Conway's Game of Life | blocks |
 | `pulse` | The picture breathes in a slow swell from the centre while it softens into patches of colour | dots |
+| `silk` | Fine threads flow along the outlines of the desktop and a slowly turning wind, in the colours beneath them | full resolution |
 
-`MELTLOCK_EFFECT=melt,sand` limits the choice (one name pins it).
+Choose which effects take part in `~/.config/meltlock/effects`, one line
+each:
+
+    sand  off
+    silk  on
+
+Effects the file does not mention are on. `MELTLOCK_EFFECT=melt,sand`
+overrides the file (one name pins it).
 `MELTLOCK_STATIC=1` forces the still picture with plain swaylock.
 `meltlock-trial` locks with an automatic unlock after 60 s.
 

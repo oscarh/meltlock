@@ -76,6 +76,18 @@ clock and palette. Each effect is a file `fx_*.go` implementing `effect`
 (`step` and `cell`) and is registered in the `effects` table in `scene.go`
 with its cell shape (`paint.go`: dot, square, bar, diamond).
 
+An effect that also implements `painter` (`frame`) draws its own pixels at
+full resolution; `scene.render` then lays the clock over it. `silk` is the
+only one. It still reads the desktop only through the cell grid, which is
+what keeps it unreadable. It costs about five times the CPU of `melt`
+(measured live: 30% of one core per output at idle clock speed, against
+6%); `go test -bench Silk` times its parts.
+
+`chooseEffect` in `main.go` reads `~/.config/meltlock/effects`
+(`name on|off` lines, unmentioned effects are on, `effects.conf` is the
+example that `make install` puts there once). `MELTLOCK_EFFECT` overrides
+it.
+
 To add one: write `fx_name.go`, add a line to the table, run
 `make test` (one test runs every effect) and look at
 `meltlock frames DIR 30 300`. A blank or dark desktop makes every effect
@@ -92,6 +104,8 @@ What the author has asked for so far:
   runs off the sides (tuned twice, constants in `fx_melt.go`).
 - More variants are welcome.
 - Something that pulses very slowly (`pulse`, added on request).
+- Something higher resolution but as dynamic (`silk`, added on request),
+  and a small file to choose the effects.
 
 Only melt has been seen on a real lock. sand, ripple, drift, life and
 pulse were judged from `frames` output; their pacing is a first guess.

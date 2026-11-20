@@ -226,8 +226,7 @@ func (b *background) draw(dt float64, now time.Time) {
 		return
 	}
 	b.sc.step(dt, now)
-	b.sc.cells(b.want)
-	damage := paint(buf.pix, b.width*4, b.width, b.height, b.sc.cols, b.sc.rows, b.want, buf.drawn)
+	damage := b.sc.render(buf.pix, b.width*4, b.width, b.height, b.want, buf.drawn)
 	if len(damage) == 0 {
 		return
 	}
@@ -256,12 +255,11 @@ func dumpFrames(dir string, snap snapshot, at []float64, effect string) error {
 		for ; t < stop; t += 1.0 / fps {
 			sc.step(1.0/fps, now.Add(time.Duration(t*float64(time.Second))))
 		}
-		sc.cells(want)
 		drawn := make([]uint32, len(want))
 		for k := range drawn {
 			drawn[k] = ^uint32(0)
 		}
-		paint(pix, width*4, width, height, snap.Cols, snap.Rows, want, drawn)
+		sc.render(pix, width*4, width, height, want, drawn)
 		img := image.NewRGBA(image.Rect(0, 0, width, height))
 		for i := 0; i < len(pix); i += 4 {
 			img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = pix[i+2], pix[i+1], pix[i], 255

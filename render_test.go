@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,12 +92,53 @@ func TestEveryEffectRunsAndPaints(t *testing.T) {
 				t.Fatalf("%s: cell %d has level %d", e.name, i, k>>24)
 			}
 		}
-		if len(paint(pix, cols*cell*4, cols*cell, rows*cell, cols, rows, want, drawn)) == 0 {
+		render := func() int {
+			return len(sc.render(pix, cols*cell*4, cols*cell, rows*cell, want, drawn))
+		}
+		if render() == 0 {
 			t.Errorf("%s: first paint reported no damage", e.name)
 		}
-		if len(paint(pix, cols*cell*4, cols*cell, rows*cell, cols, rows, want, drawn)) != 0 {
+		if _, full := sc.fx.(painter); full {
+			lit := 0
+			for i := 0; i < len(pix); i += 4 {
+				if pix[i+2] > 0x40 {
+					lit++
+				}
+			}
+			if lit < 500 {
+				t.Errorf("%s: only %d pixels lit", e.name, lit)
+			}
+		} else if render() != 0 {
 			t.Errorf("%s: repainting the same cells reported damage", e.name)
 		}
+	}
+}
+
+func TestSilkFadeReachesBackground(t *testing.T) {
+	g := sample(make([]byte, 24*24*3), 24, 24)
+	sc := newScene(2, 2, g.snapshot(), 1, "silk")
+	k := sc.fx.(*silk)
+	for i := range k.pix {
+		k.pix[i] = 0xff
+		if i%4 == 3 {
+			k.pix[i] = 0
+		}
+	}
+	for i := 0; i < 80; i++ {
+		k.fade()
+	}
+	if got, want := [4]byte(k.pix[:4]), [4]byte{0x1b, 0x11, 0x11, 0}; got != want {
+		t.Errorf("faded to %x, want %x", got, want)
+	}
+}
+
+func TestEnabledEffects(t *testing.T) {
+	got := enabledEffects("# comment\nsand off\nlife = no # dull\nmelt on\nbogus off\n")
+	if got != "melt,ripple,drift,pulse,silk" {
+		t.Errorf("enabledEffects = %q", got)
+	}
+	if got := enabledEffects(""); !strings.Contains(got, "sand") {
+		t.Errorf("empty file gave %q", got)
 	}
 }
 
