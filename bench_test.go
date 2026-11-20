@@ -2,12 +2,24 @@ package main
 
 import "testing"
 
-func BenchmarkSilk(b *testing.B) {
+func BenchmarkPainters(b *testing.B) {
 	g := sample(make([]byte, 1920*1200*3), 1920, 1200)
 	for i := range g.lum {
 		g.lum[i] = float64(i%97) / 97
 	}
 	pix := make([]byte, 1920*1200*4)
+	for _, name := range []string{"ridge", "contour", "frost"} {
+		sc := newScene(g.cols, g.rows, g.snapshot(), 1, name)
+		for i := 0; i < 600; i++ {
+			sc.fx.step(sc, 1.0/fps)
+		}
+		b.Run(name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				sc.t += 1.0 / fps
+				sc.fx.step(sc, 1.0/fps)
+			}
+		})
+	}
 	b.Run("start", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			newScene(g.cols, g.rows, g.snapshot(), 1, "silk")
@@ -22,7 +34,7 @@ func BenchmarkSilk(b *testing.B) {
 	})
 	b.Run("fade", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			k.fade()
+			k.fade(4)
 		}
 	})
 	b.Run("frame", func(b *testing.B) {

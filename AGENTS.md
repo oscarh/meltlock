@@ -77,11 +77,17 @@ clock and palette. Each effect is a file `fx_*.go` implementing `effect`
 with its cell shape (`paint.go`: dot, square, bar, diamond).
 
 An effect that also implements `painter` (`frame`) draws its own pixels at
-full resolution; `scene.render` then lays the clock over it. `silk` is the
-only one. It still reads the desktop only through the cell grid, which is
-what keeps it unreadable. It costs about five times the CPU of `melt`
-(measured live: 30% of one core per output at idle clock speed, against
-6%); `go test -bench Silk` times its parts.
+full resolution; `scene.render` then lays the clock over it. These embed
+`canvas` (`canvas.go`), which gives them `frame` and the drawing tools:
+`line`, `put`, `splat`, `clear`, `fade`, the opening `picture`. `silk`,
+`ridge`, `contour` and `frost` work this way. They still read the desktop
+only through the cell grid, which is what keeps it unreadable. The canvas
+must never hold a channel darker than the background, or `fade` breaks.
+
+Painters cost more CPU than cell effects. Measured live over a few
+seconds, share of one core per output at idle clock speed: silk 30%,
+ridge 28%, contour 25%, frost 16%, against 6% for melt.
+`go test -bench Painters` times one step of each.
 
 `chooseEffect` in `main.go` reads `~/.config/meltlock/effects`
 (`name on|off` lines, unmentioned effects are on, `effects.conf` is the
@@ -106,6 +112,7 @@ What the author has asked for so far:
 - Something that pulses very slowly (`pulse`, added on request).
 - Something higher resolution but as dynamic (`silk`, added on request),
   and a small file to choose the effects.
+- Three more high-resolution variants (`ridge`, `contour`, `frost`).
 
 Only melt has been seen on a real lock. sand, ripple, drift, life and
 pulse were judged from `frames` output; their pacing is a first guess.

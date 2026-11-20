@@ -25,6 +25,9 @@ picked at random for each lock:
 | `life` | The bright parts come alive as Conway's Game of Life | blocks |
 | `pulse` | The picture breathes in a slow swell from the centre while it softens into patches of colour | dots |
 | `silk` | Fine threads flow along the outlines of the desktop and a slowly turning wind, in the colours beneath them | full resolution |
+| `ridge` | The desktop as a landscape: lines rise where it is bright, hide the ones behind them and travel slowly upwards | full resolution |
+| `contour` | The desktop as a map: contour lines follow its brightness and spread outwards in slow rings | full resolution |
+| `frost` | Ice crystals grow over the picture, branching at sixty degrees, while it fades beneath them | full resolution |
 
 Choose which effects take part in `~/.config/meltlock/effects`, one line
 each:

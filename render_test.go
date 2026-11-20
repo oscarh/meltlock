@@ -125,7 +125,7 @@ func TestSilkFadeReachesBackground(t *testing.T) {
 		}
 	}
 	for i := 0; i < 80; i++ {
-		k.fade()
+		k.fade(4)
 	}
 	if got, want := [4]byte(k.pix[:4]), [4]byte{0x1b, 0x11, 0x11, 0}; got != want {
 		t.Errorf("faded to %x, want %x", got, want)
@@ -134,7 +134,7 @@ func TestSilkFadeReachesBackground(t *testing.T) {
 
 func TestEnabledEffects(t *testing.T) {
 	got := enabledEffects("# comment\nsand off\nlife = no # dull\nmelt on\nbogus off\n")
-	if got != "melt,ripple,drift,pulse,silk" {
+	if got != "melt,ripple,drift,pulse,silk,ridge,contour,frost" {
 		t.Errorf("enabledEffects = %q", got)
 	}
 	if got := enabledEffects(""); !strings.Contains(got, "sand") {

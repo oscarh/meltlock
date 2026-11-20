@@ -78,6 +78,9 @@ var effects = []struct {
 	{"life", shapeSquare, newLife},
 	{"pulse", shapeDot, newPulse},
 	{"silk", shapeDot, newSilk},
+	{"ridge", shapeDot, newRidge},
+	{"contour", shapeDot, newContour},
+	{"frost", shapeDot, newFrost},
 }
 
 // painter is an effect that draws the pixels itself, at full resolution,
