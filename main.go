@@ -34,7 +34,7 @@ const usage = `usage: meltlock [command]
   bg [EFFECT] [overlay]
                     draw the animated background (run by swaylock-plugin)
 
-Effects: melt, sand, ripple, drift, life. One is picked at random for each
+Effects: melt, sand, ripple, drift, life, pulse. One is picked at random for each
 lock; MELTLOCK_EFFECT=melt,sand limits the choice.
 `
 

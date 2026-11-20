@@ -23,6 +23,7 @@ picked at random for each lock:
 | `ripple` | Drops send out rings that bend the picture while it sinks out of sight | diamonds |
 | `drift` | A wind sorts each row by brightness until only gradients are left | bars |
 | `life` | The bright parts come alive as Conway's Game of Life | blocks |
+| `pulse` | The picture breathes in a slow swell from the centre while it softens into patches of colour | dots |
 
 `MELTLOCK_EFFECT=melt,sand` limits the choice (one name pins it).
 `MELTLOCK_STATIC=1` forces the still picture with plain swaylock.

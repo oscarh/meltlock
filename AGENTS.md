@@ -89,9 +89,10 @@ What the author has asked for so far:
 - melt: slow pace; the pool is a thick liquid that heaps up, slumps and
   runs off the sides (tuned twice, constants in `fx_melt.go`).
 - More variants are welcome.
+- Something that pulses very slowly (`pulse`, added on request).
 
-Only melt has been seen on a real lock. sand, ripple, drift and life were
-judged from `frames` output; their pacing is a first guess.
+Only melt has been seen on a real lock. sand, ripple, drift, life and
+pulse were judged from `frames` output; their pacing is a first guess.
 
 ## Conventions
 

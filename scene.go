@@ -76,6 +76,7 @@ var effects = []struct {
 	{"ripple", shapeDiamond, newRipple},
 	{"drift", shapeBar, newDrift},
 	{"life", shapeSquare, newLife},
+	{"pulse", shapeDot, newPulse},
 }
 
 // pickEffect chooses an effect from spec: empty or "random" means any, a
