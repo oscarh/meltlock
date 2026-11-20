@@ -62,40 +62,61 @@ func (s *scene) render(pix []byte, stride, w, h int, want, drawn []uint32) []rec
 // overlay draws the clock as dots over a painter's frame and dims the
 // area around it, with a soft edge.
 func (s *scene) overlay(pix []byte, stride, w, h int) {
-	const reach = 2 // cells over which the dimming tapers off
-	if s.shadeFor != s.stamped || len(s.shade) != len(s.mark) {
-		s.shadeFor, s.shade = s.stamped, make([]uint8, len(s.mark))
+	const reach = 3 // cells over which the dimming tapers off
+	const full = (2*reach + 1) * (2*reach + 1)
+	if s.shadeFor != s.stamped || len(s.shade) == 0 {
+		// How strongly each cell is dimmed, then that blended per pixel
+		// over the cells around the clock.
+		s.shadeFor = s.stamped
+		cells := make([]float64, len(s.mark))
+		box := rect{s.cols, s.rows, 0, 0} // left, top, right, bottom in cells
 		for i, m := range s.mark {
 			if m == plain {
 				continue
 			}
 			for r := max(i/s.cols-reach, 0); r <= min(i/s.cols+reach, s.rows-1); r++ {
 				for c := max(i%s.cols-reach, 0); c <= min(i%s.cols+reach, s.cols-1); c++ {
-					s.shade[r*s.cols+c]++
+					cells[r*s.cols+c] += 1.0 / full
+					// One cell further, where the blend reaches nothing.
+					box = rect{max(min(box.x, c-1), 0), max(min(box.y, r-1), 0), min(max(box.w, c+2), s.cols), min(max(box.h, r+2), s.rows)}
 				}
 			}
 		}
+		for i, share := range cells {
+			cells[i] = 200 * smooth(share) // eased, so the taper has no visible start or end
+		}
+		s.shadeBox = rect{box.x * cell, box.y * cell, max(0, box.w-box.x) * cell, max(0, box.h-box.y) * cell}
+		s.shade = make([]uint8, s.shadeBox.w*s.shadeBox.h+1)
+		for y := 0; y < s.shadeBox.h; y++ {
+			for x := 0; x < s.shadeBox.w; x++ {
+				s.shade[y*s.shadeBox.w+x] = uint8(s.at(cells, float64(s.shadeBox.x+x)+0.5, float64(s.shadeBox.y+y)+0.5))
+			}
+		}
 	}
-	const full = (2*reach + 1) * (2*reach + 1)
 	bg, fg := bgrOf(crust), bgrOf(text)
+	box := s.shadeBox
+	for y := box.y; y < min(box.y+box.h, h); y++ {
+		row := pix[y*stride:]
+		for x := box.x; x < min(box.x+box.w, w); x++ {
+			keep := 256 - int(s.shade[(y-box.y)*box.w+x-box.x]) // share of the picture that shows through
+			o := row[x*4:]
+			for ch := 0; ch < 3; ch++ {
+				o[ch] = uint8(bg[ch] + (int(o[ch])-bg[ch])*keep/256)
+			}
+		}
+	}
 	mask := &masks[shapeDot][levels-1]
-	for i, n := range s.shade {
-		if n == 0 {
+	for i, m := range s.mark {
+		if m != inked {
 			continue
 		}
-		keep := 256 - 200*int(n)/full // share of the picture that shows through
 		c, r := i%s.cols, i/s.cols
 		for y := 0; y < cell && r*cell+y < h; y++ {
 			row := pix[(r*cell+y)*stride:]
 			for x := 0; x < cell && c*cell+x < w; x++ {
-				o := row[(c*cell+x)*4:]
-				a := 0
-				if s.mark[i] == inked {
-					a = int(mask[y*cell+x])
-				}
+				o, a := row[(c*cell+x)*4:], int(mask[y*cell+x])
 				for ch := 0; ch < 3; ch++ {
-					dim := bg[ch] + (int(o[ch])-bg[ch])*keep/256
-					o[ch] = uint8(dim + (fg[ch]-dim)*a/255)
+					o[ch] = uint8(int(o[ch]) + (fg[ch]-int(o[ch]))*a/255)
 				}
 			}
 		}

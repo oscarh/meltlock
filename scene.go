@@ -81,6 +81,7 @@ var effects = []struct {
 	{"ridge", shapeDot, newRidge},
 	{"contour", shapeDot, newContour},
 	{"frost", shapeDot, newFrost},
+	{"lava", shapeDot, newLava},
 }
 
 // painter is an effect that draws the pixels itself, at full resolution,
@@ -116,7 +117,8 @@ type scene struct {
 	fx       effect
 	shape    uint32 // how cells are drawn, see paint.go
 	stamped  string
-	shade    []uint8 // per cell: how strongly the clock dims a painter's frame
+	shade    []uint8 // per pixel of shadeBox: how strongly the clock dims a painter's frame
+	shadeBox rect
 	shadeFor string
 }
 

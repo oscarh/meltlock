@@ -134,7 +134,7 @@ func TestSilkFadeReachesBackground(t *testing.T) {
 
 func TestEnabledEffects(t *testing.T) {
 	got := enabledEffects("# comment\nsand off\nlife = no # dull\nmelt on\nbogus off\n")
-	if got != "melt,ripple,drift,pulse,silk,ridge,contour,frost" {
+	if got != "melt,ripple,drift,pulse,silk,ridge,contour,frost,lava" {
 		t.Errorf("enabledEffects = %q", got)
 	}
 	if got := enabledEffects(""); !strings.Contains(got, "sand") {

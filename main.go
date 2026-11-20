@@ -35,7 +35,8 @@ const usage = `usage: meltlock [command]
   bg [EFFECT] [overlay]
                     draw the animated background (run by swaylock-plugin)
 
-Effects: melt, sand, ripple, drift, life, pulse, silk, ridge, contour, frost.
+Effects: melt, sand, ripple, drift, life, pulse, silk, ridge, contour, frost,
+lava.
 One is picked at random for each lock. Switch effects off in ~/.config/meltlock/effects with lines
 like "sand off"; MELTLOCK_EFFECT=melt,silk overrides the file.
 `

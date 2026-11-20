@@ -80,7 +80,9 @@ An effect that also implements `painter` (`frame`) draws its own pixels at
 full resolution; `scene.render` then lays the clock over it. These embed
 `canvas` (`canvas.go`), which gives them `frame` and the drawing tools:
 `line`, `put`, `splat`, `clear`, `fade`, the opening `picture`. `silk`,
-`ridge`, `contour` and `frost` work this way. They still read the desktop
+`ridge`, `contour`, `frost` and `lava` work this way (`lava` fills areas
+rather than drawing lines: it blends wax amounts from the lattice of cell
+corners across each cell, at 15 frames a second). They still read the desktop
 only through the cell grid, which is what keeps it unreadable. The canvas
 must never hold a channel darker than the background, or `fade` breaks.
 
@@ -113,6 +115,7 @@ What the author has asked for so far:
 - Something higher resolution but as dynamic (`silk`, added on request),
   and a small file to choose the effects.
 - Three more high-resolution variants (`ridge`, `contour`, `frost`).
+- Something like plasma or a lava lamp, starting from the screen (`lava`).
 
 Only melt has been seen on a real lock. sand, ripple, drift, life and
 pulse were judged from `frames` output; their pacing is a first guess.
