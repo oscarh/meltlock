@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -54,37 +56,60 @@ func loadSnapshot(path string) (snapshot, error) {
 	return s, err
 }
 
-type drip struct {
-	c    int
-	y, v float64
-	lum  float64
-	col  rgb
+// effect is one way of animating the dot wall. The scene owns the picture
+// (lum and col, which an effect may change), the clock and the palette.
+type effect interface {
+	// step advances the effect by dt seconds; s.t is already updated.
+	step(s *scene, dt float64)
+	// cell returns the brightness (0..1) and colour of one cell.
+	cell(s *scene, c, r int) (float64, rgb)
 }
 
-// scene is the animated dot wall: the desktop picture slowly melts as
-// drips run down it and collect in a pool at the bottom.
+// effects in the order they are listed to the user.
+var effects = []struct {
+	name  string
+	shape uint32
+	make  func(*scene) effect
+}{
+	{"melt", shapeDot, newMelt},
+	{"sand", shapeSquare, newSand},
+	{"ripple", shapeDiamond, newRipple},
+	{"drift", shapeBar, newDrift},
+	{"life", shapeSquare, newLife},
+}
+
+// pickEffect chooses an effect from spec: empty or "random" means any, a
+// comma-separated list means one of those. Unknown names are ignored.
+func pickEffect(spec string, rng *rand.Rand) string {
+	var known []string
+	for _, want := range strings.Split(spec, ",") {
+		for _, e := range effects {
+			if e.name == strings.TrimSpace(want) {
+				known = append(known, e.name)
+			}
+		}
+	}
+	if len(known) == 0 {
+		return effects[rng.Intn(len(effects))].name
+	}
+	return known[rng.Intn(len(known))]
+}
+
+// scene is the animated dot wall.
 type scene struct {
 	grid
-	glow     []float64 // brightness left behind by drips
-	glowCol  []rgb
-	vig      []float64 // darkening towards the corners
-	pool     []float64 // depth of the pool per column, in rows
-	poolNext []float64
-	poolCol  []rgb
-	drips    []drip
-	rng      *rand.Rand
-	t        float64
-	spawn    float64 // drips owed
-
-	glitchTop, glitchRows, glitchBy int
-	glitchEnd, glitchNext           float64
-
+	vig     []float64 // darkening towards the corners
+	rng     *rand.Rand
+	t       float64
+	fx      effect
+	shape   uint32 // how cells are drawn, see paint.go
 	stamped string
 }
 
 // newScene builds a scene of the given size. A snapshot of another size
-// (or none) is replaced by a faint random field.
-func newScene(cols, rows int, snap snapshot, seed int64) *scene {
+// (or none) is replaced by a faint random field, and an unknown effect by
+// the first one.
+func newScene(cols, rows int, snap snapshot, seed int64, fx string) *scene {
 	n := cols * rows
 	s := &scene{rng: rand.New(rand.NewSource(seed))}
 	s.cols, s.rows = cols, rows
@@ -100,66 +125,27 @@ func newScene(cols, rows int, snap snapshot, seed int64) *scene {
 			s.lum[i], s.col[i] = 0.25*s.rng.Float64(), accents[s.rng.Intn(len(accents))]
 		}
 	}
-	s.glow, s.glowCol, s.vig = make([]float64, n), make([]rgb, n), make([]float64, n)
+	s.vig = make([]float64, n)
 	for r := 0; r < rows; r++ {
 		for c := 0; c < cols; c++ {
 			dx, dy := float64(c)/float64(cols)-0.5, float64(r)/float64(rows)-0.5
 			s.vig[r*cols+c] = 1 - 1.3*(dx*dx+dy*dy)
 		}
 	}
-	s.pool, s.poolCol = make([]float64, cols), make([]rgb, cols)
-	for c := range s.poolCol {
-		s.poolCol[c] = lavender
+	pick := effects[0]
+	for _, e := range effects[1:] {
+		if e.name == fx {
+			pick = e
+		}
 	}
-	s.glitchNext = 2 + 4*s.rng.Float64()
+	s.shape, s.fx = pick.shape, pick.make(s)
 	return s
 }
 
 // step advances the animation by dt seconds.
 func (s *scene) step(dt float64, now time.Time) {
 	s.t += dt
-
-	fade := math.Exp(-dt / 1.6)
-	for i := range s.glow {
-		s.glow[i] *= fade
-	}
-
-	// About one new drip per twenty columns each second.
-	s.spawn += dt * float64(s.cols) / 20
-	for ; s.spawn >= 1; s.spawn-- {
-		s.addDrip()
-	}
-
-	live := s.drips[:0]
-	for _, d := range s.drips {
-		from := int(d.y)
-		d.v += 6 * dt
-		d.y += d.v * dt
-		floor := s.rows - 1 - int(s.pool[d.c])
-		for r := from + 1; r <= int(d.y) && r <= floor; r++ {
-			i := r*s.cols + d.c
-			s.glow[i], s.glowCol[i] = d.lum, d.col
-			s.lum[i] *= 0.985 // the picture wears away where drips run
-		}
-		if int(d.y) >= floor {
-			s.land(d)
-			continue
-		}
-		live = append(live, d)
-	}
-	s.drips = live
-
-	s.flow(dt)
-
-	if s.t >= s.glitchNext {
-		s.glitchTop, s.glitchRows = s.rng.Intn(s.rows), 1+s.rng.Intn(3)
-		s.glitchBy = 3 + s.rng.Intn(13)
-		if s.rng.Intn(2) == 0 {
-			s.glitchBy = -s.glitchBy
-		}
-		s.glitchEnd = s.t + 0.12
-		s.glitchNext = s.t + 3 + 6*s.rng.Float64()
-	}
+	s.fx.step(s, dt)
 
 	// Clock with a colon that blinks once a second.
 	clock := now.Format("15:04")
@@ -171,124 +157,34 @@ func (s *scene) step(dt float64, now time.Time) {
 		for i := range s.mark {
 			s.mark[i] = plain
 		}
-		s.stamp(upper(now.Format("Mon 2 Jan")), clock)
+		s.stamp(strings.ToUpper(now.Format("Mon 2 Jan")), clock)
 	}
 }
 
-// land adds a drip to the pool as a small heap around its column.
-func (s *scene) land(d drip) {
-	limit := float64(s.rows) * 0.3
-	for off, amount := range [...]float64{0.3, 1.0, 2.0, 1.0, 0.3} {
-		c := d.c + off - 2
-		if c < 0 || c >= s.cols {
-			continue
-		}
-		s.pool[c] = math.Min(limit, s.pool[c]+amount)
-		s.poolCol[c] = mix(s.poolCol[c], d.col, math.Min(1, 0.25*amount))
-	}
-}
-
-// flow moves the pool like a thick liquid: heaps slump slowly sideways,
-// run off at the screen edges, and the whole pool seeps away over time.
-func (s *scene) flow(dt float64) {
-	const spread, seep = 0.22, 0.035
-	k := math.Min(0.4, spread*dt)
-	if len(s.poolNext) != s.cols {
-		s.poolNext = make([]float64, s.cols)
-	}
-	for c := range s.pool {
-		left, right := 0.0, 0.0 // beyond the edges there is nothing
-		colL, colR := s.poolCol[c], s.poolCol[c]
-		if c > 0 {
-			left, colL = s.pool[c-1], s.poolCol[c-1]
-		}
-		if c < s.cols-1 {
-			right, colR = s.pool[c+1], s.poolCol[c+1]
-		}
-		s.poolNext[c] = (s.pool[c] + k*(left+right-2*s.pool[c])) * (1 - seep*dt)
-		// Colour is carried along with whatever flows in.
-		if in := k * (math.Max(0, left-s.pool[c]) + math.Max(0, right-s.pool[c])); in > 0 {
-			from := colL
-			if right > left {
-				from = colR
-			}
-			s.poolCol[c] = mix(s.poolCol[c], from, math.Min(1, in/(s.pool[c]+0.5)))
-		}
-	}
-	s.pool, s.poolNext = s.poolNext, s.pool
-}
-
-// addDrip starts a drip at a bright edge of the picture, or as rain from
-// the top when the column has none.
-func (s *scene) addDrip() {
-	c := s.rng.Intn(s.cols)
-	floor := s.rows - 1 - int(s.pool[c])
-	var edges []int
-	for r := 0; r < floor-1; r++ {
-		if i := r*s.cols + c; s.lum[i]-s.lum[i+s.cols] > 0.15 {
-			edges = append(edges, r)
-		}
-	}
-	d := drip{c: c, v: 2 + 5*s.rng.Float64()}
-	if len(edges) > 0 && s.rng.Float64() < 0.75 {
-		r := edges[s.rng.Intn(len(edges))]
-		i := r*s.cols + c
-		d.y, d.lum, d.col = float64(r), math.Max(s.lum[i], 0.55), s.col[i]
-	} else {
-		d.y, d.lum = float64(s.rng.Intn(s.rows/3+1)), 0.35+0.3*s.rng.Float64()
-		d.col = accents[s.rng.Intn(len(accents))]
-	}
-	s.drips = append(s.drips, d)
-}
-
-// cells returns what every cell should look like now: the dot size level
-// in the top byte and its colour as 0xRRGGBB below.
+// cells returns what every cell should look like now: shape (3 bits) and
+// size level (5 bits) in the top byte, colour as 0xRRGGBB below.
 func (s *scene) cells(out []uint32) {
-	glitch := s.t < s.glitchEnd
 	for r := 0; r < s.rows; r++ {
-		shift := 0
-		if glitch && r >= s.glitchTop && r < s.glitchTop+s.glitchRows {
-			shift = s.glitchBy
-		}
 		for c := 0; c < s.cols; c++ {
 			i := r*s.cols + c
-			src := i
-			if shift != 0 {
-				src = r*s.cols + ((c+shift)%s.cols+s.cols)%s.cols
-			}
-			l, col := s.lum[src]*s.vig[i], s.col[src]
-			if depth := s.pool[c] - float64(s.rows-1-r); depth > 0 {
-				// Inside the pool: a slow swell below a bright surface whose
-				// top dot grows as the cell fills.
-				wave := 0.5 + 0.5*math.Sin(s.t*0.8+float64(c)*0.3-float64(r)*0.7)
-				l = 0.28 + 0.14*wave
-				if depth < 1.6 {
-					l = 0.8 * math.Min(1, depth)
-				}
-				col = s.poolCol[c]
-			}
-			if g := s.glow[i]; g > l {
-				l, col = g, s.glowCol[i]
-			}
+			l, col := s.fx.cell(s, c, r)
 			switch s.mark[i] {
 			case inked:
 				l, col = 1, text
 			case quiet:
 				l *= 0.2
 			}
+			l = math.Max(0, math.Min(1, l))
 			level := int(math.Pow(l, 0.7)*(levels-1) + 0.5)
 			p := mix(surface0, col, 0.15+0.85*float64(level)/(levels-1))
-			out[i] = uint32(level)<<24 | uint32(p.r*255+0.5)<<16 | uint32(p.g*255+0.5)<<8 | uint32(p.b*255+0.5)
+			out[i] = (s.shape<<5|uint32(level))<<24 | uint32(p.r*255+0.5)<<16 | uint32(p.g*255+0.5)<<8 | uint32(p.b*255+0.5)
 		}
 	}
 }
 
-func upper(s string) string {
-	b := []byte(s)
-	for i, ch := range b {
-		if ch >= 'a' && ch <= 'z' {
-			b[i] = ch - 32
-		}
-	}
-	return string(b)
+// brightest returns the brightness that the given share of cells exceed.
+func (s *scene) brightest(share float64) float64 {
+	sorted := append([]float64(nil), s.lum...)
+	sort.Float64s(sorted)
+	return sorted[int(float64(len(sorted)-1)*(1-share))]
 }

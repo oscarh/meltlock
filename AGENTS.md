@@ -28,8 +28,9 @@ an agent, because the agent cannot type the password.
 |---|---|
 | `main.go` | Commands, screenshot per output, locker arguments, exec |
 | `render.go` | PPM reader, grid, and the still picture (melt, stamp, draw) |
-| `scene.go` | Snapshot file and the animated simulation |
-| `paint.go` | Dot masks and incremental painting into a buffer |
+| `scene.go` | Snapshot file, the shared scene and the effect table |
+| `fx_*.go` | One animation effect each |
+| `paint.go` | Cell shapes and incremental painting into a buffer |
 | `wl.go`, `bg.go` | Minimal Wayland client and the background program |
 | `font.go` | 5x7 bitmap font: digits, colon, capitals |
 
@@ -50,38 +51,47 @@ Look at the PNGs to judge changes to the effect.
 
 ## Animation
 
-With swaylock-plugin the dot wall is animated: drips run down the picture
-and wear it away, a pool collects at the bottom, bands glitch sideways,
-and the date and a running clock are shown.
+With swaylock-plugin the picture is animated, with the date and a running
+clock on top. The author has run it on real locks and likes it.
 
 - `meltlock` captures a `.snap` per output (cell grid only) into
-  `$XDG_RUNTIME_DIR/meltlock` and execs
-  `swaylock-plugin --command-each 'meltlock bg'`.
+  `$XDG_RUNTIME_DIR/meltlock`, picks an effect and execs
+  `swaylock-plugin --command-each 'meltlock bg EFFECT'`.
 - `meltlock bg` is a wallpaper client written against the raw Wayland
   protocol (`wl.go`, `bg.go`): wl_shm buffers on a layer surface, only
   changed cells repainted, paced by frame callbacks so it stops drawing
-  when the output is off. `scene.go` is the simulation, `paint.go` the dots.
+  when the output is off.
 - `scripts/build-swaylock-plugin.sh` builds swaylock-plugin into
   `~/.local/bin` without root. It patches the PAM service name to
   `swaylock` so the existing `/etc/pam.d/swaylock` is used.
 - Animated is the default when swaylock-plugin is found;
   `MELTLOCK_STATIC=1` forces the still picture with plain swaylock.
-- `scripts/trial.sh` (installed as `meltlock-trial`) runs the animated lock
-  and unlocks automatically after 60 s. The author runs it; agents do not.
+- `scripts/trial.sh` (installed as `meltlock-trial`) locks and unlocks
+  automatically after 60 s. The author runs it; agents do not.
 
-The author has run the animated lock through `meltlock-trial` and liked
-it; pace was then slowed on request (constants in `scene.go`: spawn rate,
-drip speed, wear per pass, pool growth, trail fade).
+### Effects
 
-The pool is a thick liquid (`land` and `flow` in `scene.go`): each drip
-lands as a heap that slumps sideways, runs off at the screen edges and
-seeps away. `meltlock frames DIR 180 183 186` shows a heap relaxing.
+`scene.go` owns what is shared: the picture (`lum`, `col`), vignette,
+clock and palette. Each effect is a file `fx_*.go` implementing `effect`
+(`step` and `cell`) and is registered in the `effects` table in `scene.go`
+with its cell shape (`paint.go`: dot, square, bar, diamond).
 
-Next: the author wants more animation variants of different kinds.
+To add one: write `fx_name.go`, add a line to the table, run
+`make test` (one test runs every effect) and look at
+`meltlock frames DIR 30 300`.
 
-To look at the animation without locking: `meltlock frames DIR` writes
-PNGs at 1 s, 8 s, 45 s, 4 min and 20 min; `timeout 5 meltlock bg overlay`
-shows it live on top of everything (it takes the pointer while it runs).
+What the author has asked for so far:
+
+- Keep the Catppuccin theme and the uncluttered look.
+- Every effect starts from the screenshot and leaves no more than a hint
+  of it (12 px cells already guarantee nothing is readable).
+- It need not always be dots.
+- melt: slow pace; the pool is a thick liquid that heaps up, slumps and
+  runs off the sides (tuned twice, constants in `fx_melt.go`).
+- More variants are welcome.
+
+Only melt has been seen on a real lock. sand, ripple, drift and life were
+judged from `frames` output; their pacing is a first guess.
 
 ## Conventions
 

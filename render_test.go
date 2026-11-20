@@ -60,31 +60,54 @@ func TestSnapshotRoundTripAndScene(t *testing.T) {
 	if err != nil || snap.Cols != 10 || snap.Rows != 5 || snap.Col[3] != [3]float64{0.1, 0.2, 0.3} {
 		t.Fatalf("loadSnapshot: %v %+v", err, snap)
 	}
-	sc := newScene(10, 5, snap, 1)
+	sc := newScene(10, 5, snap, 1, "melt")
 	if sc.lum[3] != 0.7 || sc.col[3] != (rgb{0.1, 0.2, 0.3}) {
 		t.Error("scene did not take the snapshot")
 	}
-	want := make([]uint32, 50)
-	drawn := make([]uint32, 50)
-	pix := make([]byte, 120*60*4)
-	now := time.Date(2026, 11, 20, 10, 45, 0, 0, time.UTC)
-	for i := 0; i < 600; i++ {
-		sc.step(1.0/fps, now)
+	// A snapshot of another size is ignored rather than trusted.
+	if other := newScene(7, 3, snap, 1, "melt"); len(other.lum) != 21 {
+		t.Error("scene used a snapshot of the wrong size")
 	}
-	sc.cells(want)
-	for i, k := range want {
-		if k>>24 >= levels {
-			t.Fatalf("cell %d has level %d", i, k>>24)
+}
+
+func TestEveryEffectRunsAndPaints(t *testing.T) {
+	const cols, rows = 40, 30
+	now := time.Date(2026, 11, 20, 10, 45, 0, 0, time.UTC)
+	for _, e := range effects {
+		g := sample(make([]byte, cols*cell*rows*cell*3), cols*cell, rows*cell)
+		rng := rand.New(rand.NewSource(2))
+		for i := range g.lum {
+			g.lum[i], g.col[i] = rng.Float64(), accents[rng.Intn(len(accents))]
+		}
+		sc := newScene(cols, rows, g.snapshot(), 1, e.name)
+		want, drawn := make([]uint32, cols*rows), make([]uint32, cols*rows)
+		pix := make([]byte, cols*cell*rows*cell*4)
+		for i := 0; i < 1500; i++ {
+			sc.step(1.0/fps, now.Add(time.Duration(i)*time.Second/fps))
+		}
+		sc.cells(want)
+		for i, k := range want {
+			if k>>29 >= shapes {
+				t.Fatalf("%s: cell %d has level %d", e.name, i, k>>24)
+			}
+		}
+		if len(paint(pix, cols*cell*4, cols*cell, rows*cell, cols, rows, want, drawn)) == 0 {
+			t.Errorf("%s: first paint reported no damage", e.name)
+		}
+		if len(paint(pix, cols*cell*4, cols*cell, rows*cell, cols, rows, want, drawn)) != 0 {
+			t.Errorf("%s: repainting the same cells reported damage", e.name)
 		}
 	}
-	if len(paint(pix, 120*4, 120, 60, 10, 5, want, drawn)) == 0 {
-		t.Error("first paint reported no damage")
+}
+
+func TestPickEffect(t *testing.T) {
+	rng := rand.New(rand.NewSource(3))
+	for i := 0; i < 50; i++ {
+		if got := pickEffect("sand, life,nonsense", rng); got != "sand" && got != "life" {
+			t.Fatalf("pickEffect chose %q", got)
+		}
 	}
-	if len(paint(pix, 120*4, 120, 60, 10, 5, want, drawn)) != 0 {
-		t.Error("repainting the same cells reported damage")
-	}
-	// A snapshot of another size is ignored rather than trusted.
-	if other := newScene(7, 3, snap, 1); len(other.lum) != 21 {
-		t.Error("scene used a snapshot of the wrong size")
+	if got := pickEffect("nonsense", rng); got == "" || got == "nonsense" {
+		t.Errorf("unknown effect gave %q", got)
 	}
 }

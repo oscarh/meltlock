@@ -32,6 +32,7 @@ type background struct {
 	w                              *wl
 	dir                            string
 	layer                          uint32
+	effect                         string
 	registry, compositor, shm      uint32
 	shell, output, surface, lsurf  uint32
 	frame                          uint32
@@ -45,12 +46,12 @@ type background struct {
 
 // runBackground draws the animation until the compositor closes it. It is
 // what swaylock-plugin starts once per output.
-func runBackground(dir string, layer uint32) error {
+func runBackground(dir string, layer uint32, effect string) error {
 	w, err := wlConnect()
 	if err != nil {
 		return err
 	}
-	b := &background{w: w, dir: dir, layer: layer, needConfigure: true}
+	b := &background{w: w, dir: dir, layer: layer, effect: effect, needConfigure: true}
 	b.registry = w.newID()
 	w.req(1, 1, b.registry) // wl_display.get_registry
 	if err := b.roundtrip(); err != nil {
@@ -207,7 +208,7 @@ func (b *background) resize(width, height int) error {
 	}
 	snap, _ := loadSnapshot(filepath.Join(b.dir, b.outName+".snap"))
 	b.width, b.height = width, height
-	b.sc = newScene(cols, rows, snap, time.Now().UnixNano())
+	b.sc = newScene(cols, rows, snap, time.Now().UnixNano(), b.effect)
 	b.want = make([]uint32, cols*rows)
 	b.pending = false
 	return nil
@@ -243,9 +244,10 @@ func (b *background) draw(dt float64, now time.Time) {
 
 // dumpFrames simulates the scene without a display and writes it as PNG
 // at the given times, for judging the animation.
-func dumpFrames(dir string, snap snapshot, at []float64) error {
+func dumpFrames(dir string, snap snapshot, at []float64, effect string) error {
+	snap.Lum = append([]float64(nil), snap.Lum...) // effects change the picture
 	width, height := snap.Cols*cell, snap.Rows*cell
-	sc := newScene(snap.Cols, snap.Rows, snap, 1)
+	sc := newScene(snap.Cols, snap.Rows, snap, 1, effect)
 	want := make([]uint32, snap.Cols*snap.Rows)
 	pix := make([]byte, width*height*4)
 	now := time.Now()
@@ -264,7 +266,7 @@ func dumpFrames(dir string, snap snapshot, at []float64) error {
 		for i := 0; i < len(pix); i += 4 {
 			img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = pix[i+2], pix[i+1], pix[i], 255
 		}
-		f, err := os.Create(filepath.Join(dir, fmt.Sprintf("frame-%04.0fs.png", stop)))
+		f, err := os.Create(filepath.Join(dir, fmt.Sprintf("%s-%04.0fs.png", effect, stop)))
 		if err != nil {
 			return err
 		}

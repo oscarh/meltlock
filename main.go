@@ -30,8 +30,12 @@ const usage = `usage: meltlock [command]
 
   (none)            lock the screen
   preview [DIR]     write the still pictures without locking
-  frames DIR [S..]  write the animation at the given seconds
-  bg [overlay]      draw the animated background (run by swaylock-plugin)
+  frames DIR [S..]  write every effect at the given seconds
+  bg [EFFECT] [overlay]
+                    draw the animated background (run by swaylock-plugin)
+
+Effects: melt, sand, ripple, drift, life. One is picked at random for each
+lock; MELTLOCK_EFFECT=melt,sand limits the choice.
 `
 
 // Indicator colours, rrggbb[aa]. Shared by swaylock and swaylock-plugin.
@@ -63,11 +67,18 @@ func main() {
 	case "":
 		err = lock(dir)
 	case "bg":
-		layer := uint32(layerBack)
-		if arg(2) == "overlay" {
-			layer = layerOverlay
+		layer, effect := uint32(layerBack), ""
+		for _, a := range os.Args[2:] {
+			if a == "overlay" {
+				layer = layerOverlay
+			} else {
+				effect = a
+			}
 		}
-		err = runBackground(dir, layer)
+		if effect == "" {
+			effect = chooseEffect()
+		}
+		err = runBackground(dir, layer, effect)
 	case "preview":
 		if arg(2) != "" {
 			dir = arg(2)
@@ -101,7 +112,7 @@ func lock(dir string) error {
 	if plugin := findPlugin(self); plugin != "" {
 		capture(dir, true)
 		args := append([]string{"swaylock-plugin"}, lockArgs...)
-		args = append(args, "--command-each", self+" bg")
+		args = append(args, "--command-each", self+" bg "+chooseEffect())
 		return syscall.Exec(plugin, args, os.Environ())
 	}
 	args := append([]string{"swaylock"}, lockArgs...)
@@ -113,6 +124,12 @@ func lock(dir string) error {
 		return err
 	}
 	return syscall.Exec(path, args, os.Environ())
+}
+
+// chooseEffect picks the effect for this lock: any of them, or one of the
+// comma-separated names in MELTLOCK_EFFECT.
+func chooseEffect() string {
+	return pickEffect(os.Getenv("MELTLOCK_EFFECT"), rand.New(rand.NewSource(time.Now().UnixNano())))
 }
 
 // findPlugin looks for swaylock-plugin next to meltlock and on the PATH.
@@ -249,5 +266,13 @@ func frames(dir string, times []string) error {
 	if err != nil {
 		return err
 	}
-	return dumpFrames(dir, g.snapshot(), at)
+	for _, e := range effects {
+		if spec := os.Getenv("MELTLOCK_EFFECT"); spec != "" && pickEffect(spec, rand.New(rand.NewSource(1))) != e.name {
+			continue
+		}
+		if err := dumpFrames(dir, g.snapshot(), at, e.name); err != nil {
+			return err
+		}
+	}
+	return nil
 }

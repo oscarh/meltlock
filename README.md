@@ -13,10 +13,20 @@ picture, in about 0.2 s, and starts swaylock even if the picture fails.
 ## Animated
 
 With `swaylock-plugin` installed (`scripts/build-swaylock-plugin.sh`) the
-dots move: drips run down the picture and slowly wear it away, a pool
-gathers at the bottom, and the date and a running clock are shown. This is
-used whenever swaylock-plugin is found; `MELTLOCK_STATIC=1` forces the
-still picture. `meltlock-trial` locks with an automatic unlock after 60 s.
+picture moves, and the date and a running clock are shown. One effect is
+picked at random for each lock:
+
+| Effect | What happens | Drawn as |
+|---|---|---|
+| `melt` | Drips run down the picture and wear it away; a thick liquid heaps up at the bottom and runs off the sides | dots |
+| `sand` | The bright parts come loose grain by grain, fall, and pile up in heaps | blocks |
+| `ripple` | Drops send out rings that bend the picture while it sinks out of sight | diamonds |
+| `drift` | A wind sorts each row by brightness until only gradients are left | bars |
+| `life` | The bright parts come alive as Conway's Game of Life | blocks |
+
+`MELTLOCK_EFFECT=melt,sand` limits the choice (one name pins it).
+`MELTLOCK_STATIC=1` forces the still picture with plain swaylock.
+`meltlock-trial` locks with an automatic unlock after 60 s.
 
 ## Use
 
@@ -26,6 +36,8 @@ still picture. `meltlock-trial` locks with an automatic unlock after 60 s.
 | `Mod+d`, "Lock Screen" | desktop entry |
 | `meltlock` | from a terminal |
 | `meltlock preview [DIR]` | render the pictures without locking |
+| `meltlock frames DIR [SECONDS..]` | render every effect at those times, without locking |
+| `timeout 5 meltlock bg sand overlay` | watch an effect live for 5 s |
 
 ## Install
 
