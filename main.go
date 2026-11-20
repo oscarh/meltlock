@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -29,7 +30,7 @@ const usage = `usage: meltlock [command]
 
   (none)            lock the screen
   preview [DIR]     write the still pictures without locking
-  frames DIR        write the animation at a few points in time
+  frames DIR [S..]  write the animation at the given seconds
   bg [overlay]      draw the animated background (run by swaylock-plugin)
 `
 
@@ -79,7 +80,7 @@ func main() {
 			fmt.Fprint(os.Stderr, usage)
 			os.Exit(2)
 		}
-		err = frames(arg(2))
+		err = frames(arg(2), os.Args[3:])
 	default:
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
@@ -226,7 +227,18 @@ func savePNG(path string, g *grid, w, h int) error {
 }
 
 // frames writes the animation of the first output at a few points in time.
-func frames(dir string) error {
+func frames(dir string, times []string) error {
+	at := []float64{1, 8, 45, 240, 1200}
+	if len(times) > 0 {
+		at = nil
+		for _, t := range times {
+			v, err := strconv.ParseFloat(t, 64)
+			if err != nil {
+				return err
+			}
+			at = append(at, v)
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	outs := outputs(ctx)
@@ -237,5 +249,5 @@ func frames(dir string) error {
 	if err != nil {
 		return err
 	}
-	return dumpFrames(dir, g.snapshot(), []float64{1, 8, 45, 240, 1200})
+	return dumpFrames(dir, g.snapshot(), at)
 }

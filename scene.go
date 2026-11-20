@@ -65,15 +65,16 @@ type drip struct {
 // drips run down it and collect in a pool at the bottom.
 type scene struct {
 	grid
-	glow    []float64 // brightness left behind by drips
-	glowCol []rgb
-	vig     []float64 // darkening towards the corners
-	pool    []float64 // depth of the pool per column, in rows
-	poolCol []rgb
-	drips   []drip
-	rng     *rand.Rand
-	t       float64
-	spawn   float64 // drips owed
+	glow     []float64 // brightness left behind by drips
+	glowCol  []rgb
+	vig      []float64 // darkening towards the corners
+	pool     []float64 // depth of the pool per column, in rows
+	poolNext []float64
+	poolCol  []rgb
+	drips    []drip
+	rng      *rand.Rand
+	t        float64
+	spawn    float64 // drips owed
 
 	glitchTop, glitchRows, glitchBy int
 	glitchEnd, glitchNext           float64
@@ -141,20 +142,14 @@ func (s *scene) step(dt float64, now time.Time) {
 			s.lum[i] *= 0.985 // the picture wears away where drips run
 		}
 		if int(d.y) >= floor {
-			limit := float64(s.rows) * 0.3
-			s.pool[d.c] = math.Min(limit, s.pool[d.c]+0.1)
-			s.poolCol[d.c] = mix(s.poolCol[d.c], d.col, 0.2)
+			s.land(d)
 			continue
 		}
 		live = append(live, d)
 	}
 	s.drips = live
 
-	// The pool levels out like a liquid.
-	k := math.Min(1, 3*dt)
-	for c := 1; c < s.cols-1; c++ {
-		s.pool[c] += k * ((s.pool[c-1]+s.pool[c+1])/2 - s.pool[c])
-	}
+	s.flow(dt)
 
 	if s.t >= s.glitchNext {
 		s.glitchTop, s.glitchRows = s.rng.Intn(s.rows), 1+s.rng.Intn(3)
@@ -178,6 +173,49 @@ func (s *scene) step(dt float64, now time.Time) {
 		}
 		s.stamp(upper(now.Format("Mon 2 Jan")), clock)
 	}
+}
+
+// land adds a drip to the pool as a small heap around its column.
+func (s *scene) land(d drip) {
+	limit := float64(s.rows) * 0.3
+	for off, amount := range [...]float64{0.3, 1.0, 2.0, 1.0, 0.3} {
+		c := d.c + off - 2
+		if c < 0 || c >= s.cols {
+			continue
+		}
+		s.pool[c] = math.Min(limit, s.pool[c]+amount)
+		s.poolCol[c] = mix(s.poolCol[c], d.col, math.Min(1, 0.25*amount))
+	}
+}
+
+// flow moves the pool like a thick liquid: heaps slump slowly sideways,
+// run off at the screen edges, and the whole pool seeps away over time.
+func (s *scene) flow(dt float64) {
+	const spread, seep = 0.22, 0.035
+	k := math.Min(0.4, spread*dt)
+	if len(s.poolNext) != s.cols {
+		s.poolNext = make([]float64, s.cols)
+	}
+	for c := range s.pool {
+		left, right := 0.0, 0.0 // beyond the edges there is nothing
+		colL, colR := s.poolCol[c], s.poolCol[c]
+		if c > 0 {
+			left, colL = s.pool[c-1], s.poolCol[c-1]
+		}
+		if c < s.cols-1 {
+			right, colR = s.pool[c+1], s.poolCol[c+1]
+		}
+		s.poolNext[c] = (s.pool[c] + k*(left+right-2*s.pool[c])) * (1 - seep*dt)
+		// Colour is carried along with whatever flows in.
+		if in := k * (math.Max(0, left-s.pool[c]) + math.Max(0, right-s.pool[c])); in > 0 {
+			from := colL
+			if right > left {
+				from = colR
+			}
+			s.poolCol[c] = mix(s.poolCol[c], from, math.Min(1, in/(s.pool[c]+0.5)))
+		}
+	}
+	s.pool, s.poolNext = s.poolNext, s.pool
 }
 
 // addDrip starts a drip at a bright edge of the picture, or as rain from
@@ -220,9 +258,13 @@ func (s *scene) cells(out []uint32) {
 			}
 			l, col := s.lum[src]*s.vig[i], s.col[src]
 			if depth := s.pool[c] - float64(s.rows-1-r); depth > 0 {
-				// Inside the pool: a slow swell, brightest at the surface.
-				wave := 0.5 + 0.5*math.Sin(s.t*1.3+float64(c)*0.3-float64(r)*0.7)
-				l = (0.3 + 0.25*wave) * math.Min(1, 0.4+depth*0.3) * s.vig[i]
+				// Inside the pool: a slow swell below a bright surface whose
+				// top dot grows as the cell fills.
+				wave := 0.5 + 0.5*math.Sin(s.t*0.8+float64(c)*0.3-float64(r)*0.7)
+				l = 0.28 + 0.14*wave
+				if depth < 1.6 {
+					l = 0.8 * math.Min(1, depth)
+				}
 				col = s.poolCol[c]
 			}
 			if g := s.glow[i]; g > l {

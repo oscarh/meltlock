@@ -73,6 +73,10 @@ The author has run the animated lock through `meltlock-trial` and liked
 it; pace was then slowed on request (constants in `scene.go`: spawn rate,
 drip speed, wear per pass, pool growth, trail fade).
 
+The pool is a thick liquid (`land` and `flow` in `scene.go`): each drip
+lands as a heap that slumps sideways, runs off at the screen edges and
+seeps away. `meltlock frames DIR 180 183 186` shows a heap relaxing.
+
 Next: the author wants more animation variants of different kinds.
 
 To look at the animation without locking: `meltlock frames DIR` writes
