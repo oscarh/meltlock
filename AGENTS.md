@@ -78,7 +78,9 @@ with its cell shape (`paint.go`: dot, square, bar, diamond).
 
 To add one: write `fx_name.go`, add a line to the table, run
 `make test` (one test runs every effect) and look at
-`meltlock frames DIR 30 300`.
+`meltlock frames DIR 30 300`. A blank or dark desktop makes every effect
+look empty; `MELTLOCK_SHOT=picture.ppm` uses a fixed picture instead of a
+screenshot (`convert some.png picture.ppm`).
 
 What the author has asked for so far:
 

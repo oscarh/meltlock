@@ -37,5 +37,5 @@ func (p *pulse) cell(s *scene, c, r int) (float64, rgb) {
 	// The main breath plus a slower, weaker one so it never repeats exactly.
 	breath := 0.5 + 0.3*math.Sin(2*math.Pi*s.t/pulsePeriod-d*0.07) +
 		0.2*math.Sin(2*math.Pi*s.t/(pulsePeriod*1.7)+float64(c)*0.04)
-	return (s.lum[i]*(0.3+0.7*breath) + 0.05*breath) * s.vig[i], s.col[i]
+	return (s.lum[i]*(0.3+0.7*breath) + 0.12*breath) * s.vig[i], s.col[i]
 }

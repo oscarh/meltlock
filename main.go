@@ -215,7 +215,14 @@ func outputs(ctx context.Context) []string {
 
 // grab screenshots one output and reduces it to the cell grid.
 func grab(ctx context.Context, out string) (g *grid, w, h int, err error) {
-	shot, err := exec.CommandContext(ctx, "grim", "-o", out, "-t", "ppm", "-").Output()
+	// MELTLOCK_SHOT names a PPM file to use in place of a screenshot, for
+	// judging effects on a fixed picture.
+	var shot []byte
+	if file := os.Getenv("MELTLOCK_SHOT"); file != "" {
+		shot, err = os.ReadFile(file)
+	} else {
+		shot, err = exec.CommandContext(ctx, "grim", "-o", out, "-t", "ppm", "-").Output()
+	}
 	if err != nil {
 		return nil, 0, 0, err
 	}
