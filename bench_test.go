@@ -8,7 +8,7 @@ func BenchmarkPainters(b *testing.B) {
 		g.lum[i] = float64(i%97) / 97
 	}
 	pix := make([]byte, 1920*1200*4)
-	for _, name := range []string{"ridge", "contour", "frost", "lava"} {
+	for _, name := range []string{"ridge", "contour", "frost"} {
 		sc := newScene(g.cols, g.rows, g.snapshot(), 1, name)
 		for i := 0; i < 600; i++ {
 			sc.fx.step(sc, 1.0/fps)

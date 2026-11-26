@@ -28,7 +28,6 @@ picked at random for each lock:
 | `ridge` | The desktop as a landscape: lines rise where it is bright, hide the ones behind them and travel slowly upwards | full resolution |
 | `contour` | The desktop as a map: contour lines follow its brightness and spread outwards in slow rings | full resolution |
 | `frost` | Ice crystals grow over the picture, branching at sixty degrees, while it fades beneath them | full resolution |
-| `lava` | A lava lamp: blobs of wax start where the desktop was bright, in its colours, then rise, merge, part and sink over a dim blur of the desktop | full resolution |
 
 Choose which effects take part in `~/.config/meltlock/effects`, one line
 each:
