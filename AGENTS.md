@@ -125,14 +125,9 @@ pulse were judged from `frames` output; their pacing is a first guess.
 
 ## Ideas
 
-From 2026-11-26, not built:
-
-- Battery-aware effects: on battery pick only the cheap cell effects and
-  keep the painters for mains power.
-- Status on the lock screen: battery level and perhaps the next calendar
-  entry under the clock, in the dot font.
-- Sway window borders in Catppuccin Mocha (sway config, not this
-  repository).
+Ideas for features are GitHub issues: `gh issue list -R ulel/meltlock`.
+Add new ones there, not here. One that belongs to neither repository: sway
+window borders in Catppuccin Mocha (sway config).
 
 ## Conventions
 
