@@ -45,7 +45,10 @@ Look at the PNGs to judge changes to the effect.
 
 - `~/.config/sway/config` binds `$mod+Escape` to `~/.local/bin/meltlock`.
 - `~/.local/share/applications/meltlock.desktop` ("Lock Screen").
-- The sway config runs `swayidle -w before-sleep meltlock lock meltlock`,
+- The sway config runs `swayidle -w`; `~/.config/swayidle/config` locks
+  after 10 minutes idle, turns the screens off after 15, locks before
+  sleep, and reloads sway 8 s after resume (waybar 0.9.24 sometimes draws
+  two bars on the external screen when it comes back). The sway config also
   binds lid close and `$mod+Shift+Escape` to `systemctl suspend`.
 - `~/.local/share/applications/suspend.desktop` ("Suspend").
 
@@ -119,6 +122,17 @@ What the author has asked for so far:
 
 Only melt has been seen on a real lock. sand, ripple, drift, life and
 pulse were judged from `frames` output; their pacing is a first guess.
+
+## Ideas
+
+From 2026-11-26, not built:
+
+- Battery-aware effects: on battery pick only the cheap cell effects and
+  keep the painters for mains power.
+- Status on the lock screen: battery level and perhaps the next calendar
+  entry under the clock, in the dot font.
+- Sway window borders in Catppuccin Mocha (sway config, not this
+  repository).
 
 ## Conventions
 
